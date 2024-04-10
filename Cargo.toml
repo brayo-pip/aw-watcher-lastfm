@@ -1,0 +1,12 @@
+[package]
+name = "aw-watcher-lastfm"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+reqwest = "0.11.6"
+serde_json = "1.0"
+serde_yaml = "0.8"
+tokio = { version = "1", features = ["full"] }
