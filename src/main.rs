@@ -5,7 +5,7 @@ use tokio::time::sleep;
 use std::fs::{File, DirBuilder};
 use std::io::prelude::*;
 use aw_client_rust::AwClient;
-use aw_models::Event;
+use aw_models::{Event, Bucket};
 use chrono::{TimeDelta, Utc};
 use dirs::config_dir;
 
@@ -47,9 +47,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = format!("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={}&api_key={}&format=json", username, apikey);
 
-    let aw_client = AwClient::new("localhost", "5600", "aw-watcher-lastfm");
+    let aw_client = AwClient::new("localhost", 5600, "aw-watcher-lastfm").unwrap();
     // creates a new bucket if it doesn't exist, otherwise does nothing
-    aw_client.create_bucket("aw-watcher-lastfm", "currently-playing").unwrap();
+    aw_client.create_bucket(&Bucket {
+        id: "lastfm".to_string(),
+        bid: None,
+        _type: "currently-playing".to_string(),
+        data: Map::new(),
+        metadata: Default::default(),
+        last_updated: None,
+        hostname: "".to_string(),
+        client: "aw-watcher-lastfm".to_string(),
+        created: None,
+        events: None,
+    }).await.unwrap();
 
     let polling_duration = std::time::Duration::from_secs(polling_interval as u64);
     let polling_time = TimeDelta::seconds(polling_interval);
@@ -71,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             duration: polling_time,
             data: data,
         };
-        aw_client.heartbeat("aw-watcher-lastfm", &event, polling_interval as f64).unwrap();
+        aw_client.heartbeat("aw-watcher-lastfm", &event, polling_interval as f64).await.unwrap();
         sleep(polling_duration).await;
     }
 }
