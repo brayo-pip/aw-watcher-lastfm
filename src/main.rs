@@ -50,7 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let aw_client = AwClient::new("localhost", "5600", "aw-firebase-sync");
     // creates a new bucket if it doesn't exist, otherwise does nothing
     aw_client.create_bucket("aw-watcher-lastfm", "currently-playing").unwrap();
-    
+
+    let polling_duration = std::time::Duration::from_secs(polling_interval as u64);
+    let polling_time = TimeDelta::seconds(polling_interval);
+
     loop {
         let response = reqwest::get(&url).await?.text().await?;
         let v: Value = serde_json::from_str(&response)?;
@@ -65,10 +68,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let event = Event {
             id: None,
             timestamp: Utc::now(),
-            duration: TimeDelta::seconds(polling_interval),
+            duration: polling_time,
             data: data,
         };
         aw_client.heartbeat("aw-watcher-lastfm", &event, polling_interval as f64).unwrap();
-        sleep(std::time::Duration::from_secs(polling_interval as u64)).await;
+        sleep(polling_duration).await;
     }
 }
