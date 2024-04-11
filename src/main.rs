@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = format!("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={}&api_key={}&format=json", username, apikey);
 
-    let aw_client = AwClient::new("localhost", "5600", "aw-firebase-sync");
+    let aw_client = AwClient::new("localhost", "5600", "aw-watcher-lastfm");
     // creates a new bucket if it doesn't exist, otherwise does nothing
     aw_client.create_bucket("aw-watcher-lastfm", "currently-playing").unwrap();
 
