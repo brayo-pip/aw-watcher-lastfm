@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             duration: TimeDelta::seconds(polling_interval),
             data: data,
         };
-        aw_client.heartbeat("aw-watcher-lastfm", &event, 5.0).unwrap();
+        aw_client.heartbeat("aw-watcher-lastfm", &event, polling_interval as f64).unwrap();
         sleep(std::time::Duration::from_secs(polling_interval as u64)).await;
     }
 }
