@@ -83,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let v = client.get(&url).send().await?.json::<Value>().await?;
 
         if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
-            sleep(std::time::Duration::from_secs(polling_interval as u64)).await;
+            sleep(polling_duration).await;
             continue;
         }
         let mut event_data = Map::new();
