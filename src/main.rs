@@ -76,10 +76,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let polling_duration = std::time::Duration::from_secs(polling_interval as u64);
     let polling_time = TimeDelta::seconds(polling_interval);
+    let client = reqwest::Client::new();
 
     loop {
-        let response = reqwest::get(&url).await?.text().await?;
-        let v: Value = serde_json::from_str(&response)?;
+        let v = client.get(&url).send().await?.json::<Value>().await?;
+
         if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
             sleep(std::time::Duration::from_secs(polling_interval as u64)).await;
             continue;
