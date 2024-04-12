@@ -47,6 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let polling_interval = yaml["polling_interval"].as_i64().unwrap();
 
     drop(file);
+
     if username == "your_username" || username == "" {
         panic!("Please set your username at {:?}", config_path.clone());
     }
