@@ -11,20 +11,21 @@ use tokio::time::sleep;
 
 fn get_config_path() -> Option<std::path::PathBuf> {
     config_dir().map(|mut path| {
+        path.push("activitywatch");
         path.push("aw-watcher-lastfm");
-        path.push("config.yaml");
         path
     })
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config_path = get_config_path().expect("Unable to get config path");
+    let config_dir = get_config_path().expect("Unable to get config path");
+    let config_path = config_dir.join("config.yaml");
 
-    if !config_path.exists() {
+    if !config_dir.exists() {
         DirBuilder::new()
             .recursive(true)
-            .create(config_path.parent().unwrap())
+            .create(config_dir)
             .expect("Unable to create directory");
         let mut file = File::create(&config_path).expect("Unable to create file");
         file.write_all(b"apikey: your-api-key\nusername: your_username\npolling_interval: 10")
