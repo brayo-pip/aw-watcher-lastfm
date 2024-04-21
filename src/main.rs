@@ -87,7 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             sleep(polling_duration).await;
             continue;
         }
-        let mut event_data = Map::new();
+        let mut event_data: Map<String, Value> = Map::new();
         event_data.insert(
             "track".to_string(),
             v["recenttracks"]["track"][0]["name"].to_owned(),
