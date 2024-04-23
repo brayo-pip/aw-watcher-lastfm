@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let mut event_data: Map<String, Value> = Map::new();
         event_data.insert(
-            "track".to_string(),
+            "title".to_string(),
             v["recenttracks"]["track"][0]["name"].to_owned(),
         );
         event_data.insert(
