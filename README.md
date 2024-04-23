@@ -32,7 +32,8 @@ cargo run
 
 This should take a few seconds then the events should be visible in localhost:5600. If aw-server or aw-server-rust is running.
 
-![image](https://github.com/brayo-pip/aw-watcher-lastfm/assets/62670517/d67e9161-d75e-4d53-9e3c-b8e14c1c05cf)
+![image](https://github.com/brayo-pip/aw-watcher-lastfm/assets/62670517/1c4cb5ff-5f2d-455b-845b-a3fcd8200f94)
+
 
 
 If everything works as expected, you can build the binary and set up a systemd service to run it in the background.
