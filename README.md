@@ -1,4 +1,5 @@
 # Activitywatch watcher for last.fm
+[![Rust](https://github.com/brayo-pip/aw-watcher-lastfm/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/brayo-pip/aw-watcher-lastfm/actions/workflows/rust.yml)
 
 This is a simple activitywatch watcher for last.fm scrobble data. It uses the last.fm API to fetch scrobbles and sends them to the activitywatch server.
 
