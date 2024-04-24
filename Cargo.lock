@@ -66,7 +66,7 @@ dependencies = [
 
 [[package]]
 name = "aw-watcher-lastfm"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "aw-client-rust",
  "aw-models",

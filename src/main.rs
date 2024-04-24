@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         panic!("Please set your api key at {:?}", config_path.clone());
     }
 
-    let url = format!("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={}&api_key={}&format=json", username, apikey);
+    let url = format!("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={}&api_key={}&format=json&limit=1", username, apikey);
 
     let aw_client = AwClient::new("localhost", 5600, "aw-watcher-lastfm-rust").unwrap();
     // creates a new bucket if it doesn't exist, otherwise does nothing
