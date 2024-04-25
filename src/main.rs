@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 use serde_yaml;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
-use tokio::time::sleep;
+use tokio::time::{interval,Duration};
 
 fn get_config_path() -> Option<std::path::PathBuf> {
     config_dir().map(|mut path| {
@@ -76,15 +76,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    let polling_duration = std::time::Duration::from_secs(polling_interval as u64);
     let polling_time = TimeDelta::seconds(polling_interval);
+    let mut interval = interval(Duration::from_secs(polling_interval as u64));
+
     let client = reqwest::Client::new();
 
     loop {
-        let v = client.get(&url).send().await?.json::<Value>().await?;
+        interval.tick().await;
+        let v: Value = client.get(&url).send().await?.json().await?;
 
         if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
-            sleep(polling_duration).await;
             continue;
         }
         let mut event_data: Map<String, Value> = Map::new();
@@ -110,6 +111,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .heartbeat("aw-watcher-lastfm", &event, polling_interval as f64)
             .await
             .unwrap();
-        sleep(polling_duration).await;
     }
 }
