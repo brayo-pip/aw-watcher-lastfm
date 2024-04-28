@@ -8,6 +8,8 @@ use serde_yaml;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
 use tokio::time::{interval,Duration};
+use log::{warn, info};
+use env_logger::Env;
 
 fn get_config_path() -> Option<std::path::PathBuf> {
     config_dir().map(|mut path| {
@@ -17,10 +19,17 @@ fn get_config_path() -> Option<std::path::PathBuf> {
     })
 }
 
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_dir = get_config_path().expect("Unable to get config path");
     let config_path = config_dir.join("config.yaml");
+    
+    let env = Env::default()
+        .filter_or("MY_LOG_LEVEL", "info")
+        .write_style_or("MY_LOG_STYLE", "always");
+
+    env_logger::init_from_env(env);
 
     if !config_dir.exists() {
         DirBuilder::new()
@@ -37,18 +46,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    let mut file = File::open(config_path.clone()).expect("Unable to open file");
+    let mut config_file = File::open(config_path.clone()).expect("Unable to open file");
     let mut contents = String::new();
-    file.read_to_string(&mut contents)
+    config_file.read_to_string(&mut contents)
         .expect("Unable to read file");
 
-    let yaml: Value = serde_yaml::from_str(&contents).unwrap();
-    let apikey = yaml["apikey"].as_str().unwrap().to_string();
-    let username = yaml["username"].as_str().unwrap().to_string();
-    let polling_interval = yaml["polling_interval"].as_i64().unwrap();
+    let yaml: Value = serde_yaml::from_str(&contents).expect("Unable to parse yaml from config file");
+    let apikey = yaml["apikey"].as_str().expect("Unable to get api key from config file").to_string();
+    let username = yaml["username"].as_str().expect("Unable to get username from config file").to_string();
+    let polling_interval = yaml["polling_interval"].as_i64().expect("Unable to get polling interval from config file");
 
-    drop(file);
+    drop(config_file);
 
+    // user just ran the program for the first time
     if username == "your_username" || username == "" {
         panic!("Please set your username at {:?}", config_path);
     }
@@ -80,15 +90,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_secs(polling_interval as u64));
 
     let client = reqwest::Client::new();
-
+    
     loop {
         interval.tick().await;
-        let v: Value = client.get(&url).send().await?.json().await?;
+        let result = client.get(&url).send().await;
+        if result.is_err() {
+            warn!("Unable to connect to last.fm");
+            continue;
+        }
+        
+        let v: Value = result.unwrap().json().await.unwrap();
 
         if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
+            info!("No song is currently playing");
             continue;
         }
         let mut event_data: Map<String, Value> = Map::new();
+        info!("Track: {} - {}", v["recenttracks"]["track"][0]["name"], v["recenttracks"]["track"][0]["artist"]["#text"]);
         event_data.insert(
             "title".to_string(),
             v["recenttracks"]["track"][0]["name"].to_owned(),
