@@ -37,7 +37,7 @@ This should take a few seconds then the events should be visible in localhost:56
 
 
 
-If everything works as expected, you can build the binary and set up a systemd service to run it in the background.
+If everything works as expected, you can build the binary and set up a systemd service to run it in the background(if running linux).
 
 ```bash
 cargo build --release
