@@ -66,6 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if username == "your_username" || username == "" {
         panic!("Please set your username at {:?}", config_path);
     }
+
     if apikey == "your-api-key" || apikey == "" {
         panic!("Please set your api key at {:?}", config_path);
     }
