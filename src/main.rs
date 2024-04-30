@@ -93,13 +93,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     loop {
         interval.tick().await;
-        let result = client.get(&url).send().await;
-        if result.is_err() {
+        let response = client.get(&url).send().await;
+        if response.is_err() {
             warn!("Unable to connect to last.fm");
             continue;
         }
         
-        let v: Value = result.unwrap().json().await.unwrap();
+        let v: Value = response.unwrap().json().await.unwrap();
 
         if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
             info!("No song is currently playing");
