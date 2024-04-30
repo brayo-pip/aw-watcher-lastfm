@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 use serde_yaml;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
-use tokio::time::{interval,Duration};
+use tokio::time::{interval, timeout, Duration};
 use log::{warn, info};
 use env_logger::Env;
 
@@ -93,13 +93,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     loop {
         interval.tick().await;
-        let response = client.get(&url).send().await;
-        if response.is_err() {
-            warn!("Unable to connect to last.fm");
-            continue;
-        }
-        
-        let v: Value = response.unwrap().json().await.unwrap();
+
+        let response = timeout(
+            Duration::from_secs(5),
+            client.get(&url).send(),
+        ).await;
+        let v: Value = match response {
+            Ok(Ok(response)) => {
+                response.json().await.unwrap()},
+            Ok(Err(e)) => {
+                warn!("Unable to connect to last.fm: {}", e);
+                continue;
+            },
+            Err(_) => {
+                warn!("Request timed out");
+                continue;
+            }
+        };
 
         if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
             info!("No song is currently playing");
