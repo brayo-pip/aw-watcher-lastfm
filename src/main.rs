@@ -55,6 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let apikey = yaml["apikey"].as_str().expect("Unable to get api key from config file").to_string();
     let username = yaml["username"].as_str().expect("Unable to get username from config file").to_string();
     let polling_interval = yaml["polling_interval"].as_i64().expect("Unable to get polling interval from config file");
+    if polling_interval < 3 {
+        // for rate limiting, recommend at least 10 seconds but 3 will work
+        panic!("Polling interval must be at least 3 seconds");
+    }
 
     drop(config_file);
 
