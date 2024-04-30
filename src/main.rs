@@ -62,7 +62,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     drop(config_file);
 
-    // user just ran the program for the first time
     if username == "your_username" || username == "" {
         panic!("Please set your username at {:?}", config_path);
     }
@@ -74,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let url = format!("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={}&api_key={}&format=json&limit=1", username, apikey);
 
     let aw_client = AwClient::new("localhost", 5600, "aw-watcher-lastfm-rust").unwrap();
-    // creates a new bucket if it doesn't exist, otherwise does nothing
+
     aw_client
         .create_bucket(&Bucket {
             id: "aw-watcher-lastfm".to_string(),
