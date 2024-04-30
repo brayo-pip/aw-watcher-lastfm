@@ -99,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         interval.tick().await;
 
         let response = timeout(
-            Duration::from_secs(5),
+            Duration::from_secs(if polling_interval < 5 { (polling_interval - 1) as u64 } else { 5 }),
             client.get(&url).send(),
         ).await;
         let v: Value = match response {
