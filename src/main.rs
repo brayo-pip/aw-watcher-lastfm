@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 use serde_yaml;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
-use tokio::time::{interval, timeout, Duration};
+use tokio::time::{interval, Duration};
 use log::{warn, info};
 use env_logger::Env;
 
@@ -93,24 +93,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let polling_time = TimeDelta::seconds(polling_interval);
     let mut interval = interval(Duration::from_secs(polling_interval as u64));
 
-    let client = reqwest::Client::new();
+    let client = reqwest::ClientBuilder::new()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
     
     loop {
         interval.tick().await;
 
-        let response = timeout(
-            Duration::from_secs(if polling_interval < 5 { (polling_interval - 1) as u64 } else { 5 }),
-            client.get(&url).send(),
-        ).await;
+        let response = client.get(&url).send().await;
         let v: Value = match response {
-            Ok(Ok(response)) => {
-                response.json().await.unwrap()},
-            Ok(Err(e)) => {
-                warn!("Unable to connect to last.fm: {}", e);
-                continue;
-            },
-            Err(_) => {
-                warn!("Request timed out");
+            Ok(response) => {
+                match response.json().await {
+                    Ok(json) => json,
+                    Err(e) => {
+                        warn!("Error parsing json: {}", e);
+                        continue;
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Error connecting to last.fm: {}", e);
                 continue;
             }
         };
