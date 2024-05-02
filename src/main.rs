@@ -2,14 +2,14 @@ use aw_client_rust::AwClient;
 use aw_models::{Bucket, Event};
 use chrono::{TimeDelta, Utc};
 use dirs::config_dir;
+use env_logger::Env;
+use log::{info, warn};
 use reqwest;
 use serde_json::{Map, Value};
 use serde_yaml;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
 use tokio::time::{interval, Duration};
-use log::{warn, info};
-use env_logger::Env;
 
 fn get_config_path() -> Option<std::path::PathBuf> {
     config_dir().map(|mut path| {
@@ -19,12 +19,11 @@ fn get_config_path() -> Option<std::path::PathBuf> {
     })
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_dir = get_config_path().expect("Unable to get config path");
     let config_path = config_dir.join("config.yaml");
-    
+
     let env = Env::default()
         .filter_or("MY_LOG_LEVEL", "info")
         .write_style_or("MY_LOG_STYLE", "always");
@@ -48,13 +47,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut config_file = File::open(config_path.clone()).expect("Unable to open file");
     let mut contents = String::new();
-    config_file.read_to_string(&mut contents)
+    config_file
+        .read_to_string(&mut contents)
         .expect("Unable to read file");
 
-    let yaml: Value = serde_yaml::from_str(&contents).expect("Unable to parse yaml from config file");
-    let apikey = yaml["apikey"].as_str().expect("Unable to get api key from config file").to_string();
-    let username = yaml["username"].as_str().expect("Unable to get username from config file").to_string();
-    let polling_interval = yaml["polling_interval"].as_i64().expect("Unable to get polling interval from config file");
+    let yaml: Value =
+        serde_yaml::from_str(&contents).expect("Unable to parse yaml from config file");
+    let apikey = yaml["apikey"]
+        .as_str()
+        .expect("Unable to get api key from config file")
+        .to_string();
+    let username = yaml["username"]
+        .as_str()
+        .expect("Unable to get username from config file")
+        .to_string();
+    let polling_interval = yaml["polling_interval"]
+        .as_i64()
+        .expect("Unable to get polling interval from config file");
     if polling_interval < 3 {
         // for rate limiting, recommend at least 10 seconds but 3 will work
         panic!("Polling interval must be at least 3 seconds");
@@ -97,21 +106,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .timeout(Duration::from_secs(5))
         .build()
         .unwrap();
-    
+
     loop {
         interval.tick().await;
 
         let response = client.get(&url).send().await;
         let v: Value = match response {
-            Ok(response) => {
-                match response.json().await {
-                    Ok(json) => json,
-                    Err(e) => {
-                        warn!("Error parsing json: {}", e);
-                        continue;
-                    }
+            Ok(response) => match response.json().await {
+                Ok(json) => json,
+                Err(e) => {
+                    warn!("Error parsing json: {}", e);
+                    continue;
                 }
-            }
+            },
             Err(e) => {
                 warn!("Error connecting to last.fm: {}", e);
                 continue;
@@ -123,7 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             continue;
         }
         let mut event_data: Map<String, Value> = Map::new();
-        info!("Track: {} - {}", v["recenttracks"]["track"][0]["name"], v["recenttracks"]["track"][0]["artist"]["#text"]);
+        info!(
+            "Track: {} - {}",
+            v["recenttracks"]["track"][0]["name"], v["recenttracks"]["track"][0]["artist"]["#text"]
+        );
         event_data.insert(
             "title".to_string(),
             v["recenttracks"]["track"][0]["name"].to_owned(),
