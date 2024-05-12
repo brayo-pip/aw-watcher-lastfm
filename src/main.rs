@@ -10,6 +10,7 @@ use serde_yaml;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
 use std::env;
+use std::thread::sleep;
 use tokio::time::{interval, Duration};
 
 fn get_config_path() -> Option<std::path::PathBuf> {
@@ -20,6 +21,27 @@ fn get_config_path() -> Option<std::path::PathBuf> {
     })
 }
 
+async fn create_bucket(aw_client: &AwClient) -> Result<(), Box<dyn std::error::Error>> {
+    let res = aw_client
+        .create_bucket(&Bucket {
+            id: "aw-watcher-lastfm".to_string(),
+            bid: None,
+            _type: "currently-playing".to_string(),
+            data: Map::new(),
+            metadata: Default::default(),
+            last_updated: None,
+            hostname: "".to_string(),
+            client: "aw-watcher-lastfm-rust".to_string(),
+            created: None,
+            events: None,
+        })
+        .await;
+    if res.is_err() {
+        warn!("Error creating bucket: {:?}", res.err());
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_dir = get_config_path().expect("Unable to get config path");
@@ -28,12 +50,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
     let mut port: u16 = 5600;
     if args.len() > 1 {
-        for arg in args.iter() {
-            if arg.starts_with("--port=") {
-                port = arg.split('=').collect::<Vec<&str>>()[1].parse().expect("Invalid port");
+        for idx in 1..args.len() {
+            if args[idx] == "--port" {
+                port = args[idx + 1].parse().expect("Invalid port number");
                 break;
-            } else if arg.starts_with("--testing") {
-                port = 5666;
+            }
+            if args[idx] == "--testing" {
+                port = 5699;
+            }
+            if args[idx] == "--help" {
+                println!("Usage: aw-watcher-lastfm-rust [--testing] [--port PORT] [--help]");
+                return Ok(());
             }
         }
     }
@@ -95,23 +122,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = format!("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={}&api_key={}&format=json&limit=1", username, apikey);
 
-    let aw_client = AwClient::new("localhost", port, "aw-watcher-lastfm-rust").unwrap();
+    let mut aw_client = AwClient::new("localhost", port, "aw-watcher-lastfm-rust").unwrap();
 
-    aw_client
-        .create_bucket(&Bucket {
-            id: "aw-watcher-lastfm".to_string(),
-            bid: None,
-            _type: "currently-playing".to_string(),
-            data: Map::new(),
-            metadata: Default::default(),
-            last_updated: None,
-            hostname: "".to_string(),
-            client: "aw-watcher-lastfm-rust".to_string(),
-            created: None,
-            events: None,
-        })
-        .await
-        .unwrap();
+    let mut res = create_bucket(&aw_client).await;
+    let retries = 5;
+    while res.is_err() && retries > 0 {
+        warn!("Error creating bucket: {:?}", res.err());
+        sleep(Duration::from_secs(1));
+        aw_client = AwClient::new("localhost", port, "aw-watcher-lastfm-rust").unwrap();
+        res = create_bucket(&aw_client).await;
+    }
 
     let polling_time = TimeDelta::seconds(polling_interval);
     let mut interval = interval(Duration::from_secs(polling_interval as u64));
@@ -168,7 +188,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         aw_client
             .heartbeat("aw-watcher-lastfm", &event, polling_interval as f64)
-            .await
-            .unwrap();
+            .await.unwrap_or_else(|e| {
+                warn!("Error sending heartbeat: {:?}", e);
+            });
     }
 }
