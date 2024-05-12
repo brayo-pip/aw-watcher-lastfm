@@ -9,6 +9,7 @@ use serde_json::{Map, Value};
 use serde_yaml;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
+use std::env;
 use tokio::time::{interval, Duration};
 
 fn get_config_path() -> Option<std::path::PathBuf> {
@@ -23,6 +24,19 @@ fn get_config_path() -> Option<std::path::PathBuf> {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_dir = get_config_path().expect("Unable to get config path");
     let config_path = config_dir.join("config.yaml");
+
+    let args: Vec<String> = env::args().collect();
+    let mut port: u16 = 5600;
+    if args.len() > 1 {
+        for arg in args.iter() {
+            if arg.starts_with("--port=") {
+                port = arg.split('=').collect::<Vec<&str>>()[1].parse().expect("Invalid port");
+                break;
+            } else if arg.starts_with("--testing") {
+                port = 5666;
+            }
+        }
+    }
 
     let env = Env::default()
         .filter_or("MY_LOG_LEVEL", "info")
@@ -81,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let url = format!("http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user={}&api_key={}&format=json&limit=1", username, apikey);
 
-    let aw_client = AwClient::new("localhost", 5600, "aw-watcher-lastfm-rust").unwrap();
+    let aw_client = AwClient::new("localhost", port, "aw-watcher-lastfm-rust").unwrap();
 
     aw_client
         .create_bucket(&Bucket {
@@ -119,8 +133,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     continue;
                 }
             },
-            Err(e) => {
-                warn!("Error connecting to last.fm: {}", e);
+            Err(_) => {
+                warn!("Error connecting to last.fm");
                 continue;
             }
         };
