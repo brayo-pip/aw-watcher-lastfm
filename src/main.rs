@@ -104,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .to_string();
     let polling_interval = yaml["polling_interval"]
         .as_i64()
-        .expect("Unable to get polling interval from config file");
+        .unwrap_or(10);
     if polling_interval < 3 {
         // for rate limiting, recommend at least 10 seconds but 3 will work
         panic!("Polling interval must be at least 3 seconds");
