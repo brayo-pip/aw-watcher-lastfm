@@ -71,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     env_logger::init_from_env(env);
 
-    if !config_dir.exists() {
+    if !config_path.exists() {
         DirBuilder::new()
             .recursive(true)
             .create(config_dir)
