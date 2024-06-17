@@ -79,11 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut file = File::create(&config_path).expect("Unable to create file");
         file.write_all(b"apikey: your-api-key\nusername: your_username\npolling_interval: 10")
             .expect("Unable to write to file");
-        println!(
-            "Please set your api key and username at {:?}",
-            config_path.clone()
-        );
-        return Ok(());
+        panic!("Please set your api key and username at {:?}", config_path);
     }
 
     let mut config_file = File::open(config_path.clone()).expect("Unable to open file");
