@@ -25,7 +25,7 @@ cd aw-watcher-lastfm
 ```
 
 
-On first run, you will be prompted to configure last.fm API key and your last.fm username. You can get the apikey from the [last.fm API page](https://www.last.fm/api/account/create).
+On first run, you will be prompted to configure last.fm API key and your last.fm username. You can get the apikey from the [Last.fm API page](https://www.last.fm/api/accounts).
 
 ```bash
 cargo run
