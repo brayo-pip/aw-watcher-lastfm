@@ -7,9 +7,9 @@ use log::{info, warn};
 use reqwest;
 use serde_json::{Map, Value};
 use serde_yaml;
+use std::env;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
-use std::env;
 use std::thread::sleep;
 use tokio::time::{interval, Duration};
 
@@ -36,10 +36,13 @@ async fn create_bucket(aw_client: &AwClient) -> Result<(), Box<dyn std::error::E
             events: None,
         })
         .await;
-    if res.is_err() {
-        warn!("Error creating bucket: {:?}", res.err());
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            warn!("Error creating bucket: {:?}", e);
+            Err(Box::new(e))
+        }
     }
-    Ok(())
 }
 
 #[tokio::main]
@@ -98,9 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .as_str()
         .expect("Unable to get username from config file")
         .to_string();
-    let polling_interval = yaml["polling_interval"]
-        .as_i64()
-        .unwrap_or(10);
+    let polling_interval = yaml["polling_interval"].as_i64().unwrap_or(10);
     if polling_interval < 3 {
         // for rate limiting, recommend at least 10 seconds but 3 will work
         panic!("Polling interval must be at least 3 seconds");
@@ -184,7 +185,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         aw_client
             .heartbeat("aw-watcher-lastfm", &event, polling_interval as f64)
-            .await.unwrap_or_else(|e| {
+            .await
+            .unwrap_or_else(|e| {
                 warn!("Error sending heartbeat: {:?}", e);
             });
     }
