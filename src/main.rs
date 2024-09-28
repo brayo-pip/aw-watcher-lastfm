@@ -101,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .as_str()
         .expect("Unable to get username from config file")
         .to_string();
-    let polling_interval = yaml["polling_interval"].as_i64().unwrap_or(10);
+    let polling_interval = yaml["polling_interval"].as_u64().unwrap_or(10);
     if polling_interval < 3 {
         // for rate limiting, recommend at least 10 seconds but 3 will work
         panic!("Polling interval must be at least 3 seconds");
@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         res = create_bucket(&aw_client).await;
     }
 
-    let polling_time = TimeDelta::seconds(polling_interval);
+    let polling_time = TimeDelta::seconds(polling_interval as i64);
     let mut interval = interval(Duration::from_secs(polling_interval as u64));
 
     let client = reqwest::ClientBuilder::new()
