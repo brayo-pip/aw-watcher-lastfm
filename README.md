@@ -9,8 +9,11 @@ This is a simple activitywatch watcher for last.fm scrobble data. It uses the la
 - [Rust](https://www.rust-lang.org/tools/install)
 - [Last.fm API account](https://www.last.fm/)
 
-
 ## Installation
+
+Download the binary for your OS from releases.
+
+## Installation from source
 
 Clone the repository
 
