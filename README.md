@@ -3,15 +3,29 @@
 
 This is a simple activitywatch watcher for last.fm scrobble data. It uses the last.fm API to fetch scrobbles and sends them to the activitywatch server.
 
-## Prerequisites
+# Prerequisites
 
 - [Activitywatch](https://github.com/ActivityWatch/activitywatch)
 - [Rust](https://www.rust-lang.org/tools/install)
 - [Last.fm API account](https://www.last.fm/)
 
-## Installation
+# Installation
 
-Download the binary for your OS from releases.
+Download the binary for your OS from releases, or use one the the options below
+
+## Installation using cargo
+
+```bash
+cargo install --git https://github.com/brayo-pip/aw-watcher-lastfm.git
+```
+
+You can then add `aw-watcher-lastfm` to `autostart_modules` in your `aw-qt.toml`
+
+i.e:
+```ini
+[aw-qt]
+autostart_modules = ["aw-server-rust", "aw-watcher-afk", "aw-awatcher", "aw-watcher-lastfm"]
+```
 
 ## Installation from source
 
@@ -46,6 +60,6 @@ If everything works as expected, you can build the binary and set up a systemd s
 cargo build --release
 ```
 
-## Contributing
+# Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
