@@ -5,11 +5,19 @@ on:
     types: [created]
 
 jobs:
-  build-and-release:
+  build:
+    name: Build Binary
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: aw-watcher-lastfm-linux
+          - os: macos-latest
+            artifact_name: aw-watcher-lastfm-macos
+          - os: windows-latest
+            artifact_name: aw-watcher-lastfm-windows.exe
 
     steps:
     - name: Checkout code
@@ -21,18 +29,34 @@ jobs:
     - name: Build project
       run: cargo build --release
 
-    - name: Upload binaries
+    - name: Rename binary
+      shell: bash
+      run: |
+        cd target/release
+        if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          mv aw-watcher-lastfm.exe ${{ matrix.artifact_name }}
+        else
+          mv aw-watcher-lastfm ${{ matrix.artifact_name }}
+        fi
+
+    - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.os }}-binary
-        path: target/release/
+        name: ${{ matrix.artifact_name }}
+        path: target/release/${{ matrix.artifact_name }}
 
-    - name: Download binaries
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Download all artifacts
       uses: actions/download-artifact@v3
       with:
-        name: ${{ matrix.os }}-binary
+        path: artifacts
 
-    - name: Create Release and Upload Assets
+    - name: Create Release
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,4 +66,6 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          target/release/*
+          artifacts/aw-watcher-lastfm-linux/aw-watcher-lastfm-linux
+          artifacts/aw-watcher-lastfm-macos/aw-watcher-lastfm-macos
+          artifacts/aw-watcher-lastfm-windows.exe/aw-watcher-lastfm-windows.exe
