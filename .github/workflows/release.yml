@@ -36,6 +36,9 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
     - name: Download binaries
       uses: actions/download-artifact@v3
