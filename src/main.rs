@@ -1,26 +1,29 @@
 use aw_client_rust::AwClient;
 use aw_models::{Bucket, Event};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDateTime, TimeDelta, Utc};
-use regex::Regex;
-use std::path::PathBuf;
+use dirs::config_dir;
 use env_logger::Env;
 use log::{info, warn};
+use regex::Regex;
 use reqwest;
 use serde_json::{Map, Value};
 use serde_yaml;
 use std::env;
-use dirs::config_dir;
 use std::fs::{DirBuilder, File};
 use std::io::prelude::*;
+use std::process;
 use std::thread::sleep;
+use tokio::signal;
 use tokio::time::{interval, Duration};
+#[cfg(unix)]
+use tokio::signal::unix::{signal, SignalKind};
 
 fn parse_time_string(time_str: &str) -> Option<ChronoDuration> {
     let re = Regex::new(r"^(\d+)([dhm])$").unwrap();
     if let Some(caps) = re.captures(time_str) {
         let amount: i64 = caps.get(1)?.as_str().parse().ok()?;
         let unit = caps.get(2)?.as_str();
-        
+
         match unit {
             "d" => Some(ChronoDuration::days(amount)),
             "h" => Some(ChronoDuration::hours(amount)),
@@ -52,16 +55,10 @@ async fn sync_historical_data(
         info!("Syncing {} historical tracks...", tracks.len());
         for track in tracks.iter().rev() {
             let mut event_data: Map<String, Value> = Map::new();
-            
+
             event_data.insert("title".to_string(), track["name"].to_owned());
-            event_data.insert(
-                "artist".to_string(),
-                track["artist"]["#text"].to_owned(),
-            );
-            event_data.insert(
-                "album".to_string(),
-                track["album"]["#text"].to_owned(),
-            );
+            event_data.insert("artist".to_string(), track["artist"]["#text"].to_owned());
+            event_data.insert("album".to_string(), track["album"]["#text"].to_owned());
 
             // Get timestamp from the track
             if let Some(date) = track["date"]["uts"].as_str() {
@@ -69,7 +66,10 @@ async fn sync_historical_data(
                     // TODO: remove the deprecated from_utc and from_timestamp
                     let event = Event {
                         id: None,
-                        timestamp: DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(timestamp, 0), Utc),
+                        timestamp: DateTime::<Utc>::from_utc(
+                            NaiveDateTime::from_timestamp(timestamp, 0),
+                            Utc,
+                        ),
                         duration: TimeDelta::seconds(30),
                         data: event_data,
                     };
@@ -120,6 +120,117 @@ async fn create_bucket(aw_client: &AwClient) -> Result<(), Box<dyn std::error::E
         }
     }
 }
+#[cfg(unix)]
+async fn run_unix_loop(
+    mut interval: tokio::time::Interval,
+    client: reqwest::Client,
+    url: String,
+    aw_client: AwClient,
+    polling_time: TimeDelta,
+    polling_interval: u64,
+) {
+    let mut sigterm = signal(SignalKind::terminate())
+        .expect("Failed to set up SIGTERM handler");
+
+    loop {
+        tokio::select! {
+            _ = signal::ctrl_c() => {
+                info!("Ctrl+C received, shutting down...");
+                process::exit(0);
+            }
+            _ = sigterm.recv() => {
+                info!("SIGTERM received, shutting down...");
+                process::exit(0);
+            }
+            _ = interval.tick() => {
+                handle_lastfm_update(&client, &url, &aw_client, polling_time, polling_interval).await;
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+async fn run_windows_loop(
+    mut interval: tokio::time::Interval,
+    client: reqwest::Client,
+    url: String,
+    aw_client: AwClient,
+    polling_time: TimeDelta,
+    polling_interval: u64,
+) {
+    loop {
+        tokio::select! {
+            _ = signal::ctrl_c() => {
+                info!("Ctrl+C received, shutting down...");
+                process::exit(0);
+            }
+            _ = interval.tick() => {
+                handle_lastfm_update(&client, &url, &aw_client, polling_time, polling_interval).await;
+            }
+        }
+    }
+}
+
+async fn handle_lastfm_update(
+    client: &reqwest::Client,
+    url: &str,
+    aw_client: &AwClient,
+    polling_time: TimeDelta,
+    polling_interval: u64,
+) {
+    let response = client.get(url).send().await;
+    let v: Value = match response {
+        Ok(response) => match response.json().await {
+            Ok(json) => json,
+            Err(e) => {
+                warn!("Error parsing json: {}", e);
+                return;
+            }
+        },
+        Err(_) => {
+            warn!("Error connecting to last.fm");
+            return;
+        }
+    };
+
+    if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
+        info!("No song is currently playing");
+        return;
+    }
+
+    let mut event_data: Map<String, Value> = Map::new();
+    info!(
+        "Track: {} - {}",
+        v["recenttracks"]["track"][0]["name"], v["recenttracks"]["track"][0]["artist"]["#text"]
+    );
+
+    event_data.insert(
+        "title".to_string(),
+        v["recenttracks"]["track"][0]["name"].to_owned(),
+    );
+    event_data.insert(
+        "artist".to_string(),
+        v["recenttracks"]["track"][0]["artist"]["#text"].to_owned(),
+    );
+    event_data.insert(
+        "album".to_string(),
+        v["recenttracks"]["track"][0]["album"]["#text"].to_owned(),
+    );
+
+    let event = Event {
+        id: None,
+        timestamp: Utc::now(),
+        duration: polling_time,
+        data: event_data,
+    };
+
+    aw_client
+        .heartbeat("aw-watcher-lastfm", &event, polling_interval as f64)
+        .await
+        .unwrap_or_else(|e| {
+            warn!("Error sending heartbeat: {:?}", e);
+        });
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -147,8 +258,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "--sync" => {
                 if idx + 1 < args.len() {
-                    sync_duration = Some(parse_time_string(&args[idx + 1])
-                        .expect("Invalid sync duration format. Use format: 7d, 24h, or 30m"));
+                    sync_duration = Some(
+                        parse_time_string(&args[idx + 1])
+                            .expect("Invalid sync duration format. Use format: 7d, 24h, or 30m"),
+                    );
                     idx += 2;
                 } else {
                     panic!("--sync requires a duration value (e.g., 7d, 24h, 30m)");
@@ -252,56 +365,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Starting real-time tracking...");
     }
 
-    loop {
-        interval.tick().await;
+    #[cfg(unix)]
+    run_unix_loop(interval, client, url, aw_client, polling_time, polling_interval).await;
 
-        let response = client.get(&url).send().await;
-        let v: Value = match response {
-            Ok(response) => match response.json().await {
-                Ok(json) => json,
-                Err(e) => {
-                    warn!("Error parsing json: {}", e);
-                    continue;
-                }
-            },
-            Err(_) => {
-                warn!("Error connecting to last.fm");
-                continue;
-            }
-        };
+    #[cfg(windows)]
+    run_windows_loop(interval, client, url, aw_client, polling_time, polling_interval).await;
 
-        if v["recenttracks"]["track"][0]["@attr"]["nowplaying"].as_str() != Some("true") {
-            info!("No song is currently playing");
-            continue;
-        }
-        let mut event_data: Map<String, Value> = Map::new();
-        info!(
-            "Track: {} - {}",
-            v["recenttracks"]["track"][0]["name"], v["recenttracks"]["track"][0]["artist"]["#text"]
-        );
-        event_data.insert(
-            "title".to_string(),
-            v["recenttracks"]["track"][0]["name"].to_owned(),
-        );
-        event_data.insert(
-            "artist".to_string(),
-            v["recenttracks"]["track"][0]["artist"]["#text"].to_owned(),
-        );
-        event_data.insert(
-            "album".to_string(),
-            v["recenttracks"]["track"][0]["album"]["#text"].to_owned(),
-        );
-        let event = Event {
-            id: None,
-            timestamp: Utc::now(),
-            duration: polling_time,
-            data: event_data,
-        };
-        aw_client
-            .heartbeat("aw-watcher-lastfm", &event, polling_interval as f64)
-            .await
-            .unwrap_or_else(|e| {
-                warn!("Error sending heartbeat: {:?}", e);
-            });
-    }
+    return Ok(());
 }
